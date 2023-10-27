@@ -25,7 +25,6 @@ import java.util.Map;
 import android.annotation.SuppressLint;
 import android.content.ContentResolver;
 import android.content.Context;
-import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapRegionDecoder;
 import android.graphics.BitmapFactory;
@@ -37,7 +36,6 @@ import android.os.AsyncTask;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 
-import com.facebook.common.logging.FLog;
 import com.facebook.react.bridge.GuardedAsyncTask;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -380,13 +378,9 @@ public class ImageEditorModule extends ReactContextBaseJavaModule {
   // Utils
 
   private static void copyExif(Context context, Uri oldImage, File newFile) throws IOException {
-    File oldFile = getFileFromUri(context, oldImage);
-    if (oldFile == null) {
-      FLog.w(ReactConstants.TAG, "Couldn't get real path for uri: " + oldImage);
-      return;
-    }
-
-    ExifInterface oldExif = new ExifInterface(oldFile.getAbsolutePath());
+    ExifInterface oldExif = new ExifInterface(
+      context.getContentResolver().openFileDescriptor(oldImage, "r").getFileDescriptor()
+    );
     ExifInterface newExif = new ExifInterface(newFile.getAbsolutePath());
     for (String attribute : EXIF_ATTRIBUTES) {
       String value = oldExif.getAttribute(attribute);
@@ -395,30 +389,7 @@ public class ImageEditorModule extends ReactContextBaseJavaModule {
       }
     }
     newExif.saveAttributes();
-  }
-
-  private static @Nullable File getFileFromUri(Context context, Uri uri) {
-    if (uri.getScheme().equals("file")) {
-      return new File(uri.getPath());
-    } else if (uri.getScheme().equals("content")) {
-      Cursor cursor = context.getContentResolver()
-        .query(uri, new String[] { MediaStore.MediaColumns.DATA }, null, null, null);
-      if (cursor != null) {
-        try {
-          if (cursor.moveToFirst()) {
-            String path = cursor.getString(0);
-            if (!TextUtils.isEmpty(path)) {
-              return new File(path);
-            }
-          }
-        } finally {
-          cursor.close();
-        }
-      }
-    }
-
-    return null;
-  }
+  }  
 
   private static boolean isLocalUri(String uri) {
     for (String localPrefix : LOCAL_URI_PREFIXES) {
